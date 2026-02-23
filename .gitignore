@@ -1,0 +1,6 @@
+__pycache__
+.conda
+.venv
+ToDolist
+testfilething.py
+.DS_Store
