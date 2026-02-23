@@ -22,7 +22,7 @@ bullet_img_list=["sprites/Pistol_bullet.png", ":resources:images/space_shooter/l
 
 colors = [arcade.color.RED, arcade.color.GREEN, arcade.color.BLUE, arcade.color.YELLOW, arcade.color.PURPLE]
 upgrade_names = ["Health Boost", "Damage Boost", "Speed Boost", "Fire Rate Boost", "Bullet Size Boost"]
-upgrade_multipliers = [100, 1.5, 1.5, 0.75, 1.5]  # Multipliers for each upgrade type
+upgrade_multipliers = [100, 1.2, 1.5, 0.75, 1.1]  # Multipliers for each upgrade type
 upgrade_costs = [100, 150, 120, 200, 180]  # Costs for each upgrade type
 
 UPGRADE_SUCCESS_SOUND = arcade.sound.load_sound(":resources:sounds/coin1.wav")
