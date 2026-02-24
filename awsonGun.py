@@ -143,6 +143,8 @@ class Weapons(arcade.SpriteList):
         self.current_gun.position = (0, 0)  # Set initial position to (0, 0)
 
     def switch_gun(self):
+        if not self.current_gun.visible:  # Prevent switching if the gun is hidden
+            return
         self.current_gun_index = (self.current_gun_index + 1) % self.n_slot   
         self.current_gun = self.guns[self.current_gun_index]
         self.current_gun.update_gun_config(self.current_gun_index)

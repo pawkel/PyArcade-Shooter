@@ -34,10 +34,9 @@ class Hero(Sprite):
         self.weapons = Weapons(n_slot=3)
 
     def update_all(self, delta_time):
-        self.update()
-        self.weapons.current_gun.update_gun(self.center_x, self.center_y, self.angle)
-        self.weapons.current_gun.bullet_list.update()
-        self.weapons.current_gun.update()
+        self.update()  # Update the player's position
+        self.weapons.current_gun.update_gun(self.center_x, self.center_y, self.angle)  # Update gun position
+        self.weapons.current_gun.bullet_list.update()  # Update bullets
 
     def increase_x(self):
         self.center_x += 5
@@ -63,6 +62,7 @@ class Hero(Sprite):
             self.center_y = -1000
             self.visible = False
             self.dead = True
+            self.weapons.current_gun.visible = False  # Hide the gun
 
     def respawn(self):
         """Respawn the player without resetting upgrades."""
@@ -71,6 +71,7 @@ class Hero(Sprite):
         self.center_y = 200
         self.visible = True
         self.dead = False
+        self.weapons.current_gun.visible = True  # Show the gun
 
     def add_score(self, points):
         self.score += points

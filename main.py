@@ -115,7 +115,11 @@ class GameOverView(arcade.View):
         @return_button.event("on_click")
         def on_click(event):
             title_view = TitleView()
+            arcade.schedule(title_view.on_update, 1 / 60)  # Schedule the game update loop
             self.window.show_view(title_view)
+
+
+
 
     def on_draw(self):
         """ Render the game-over screen. """
@@ -179,6 +183,32 @@ class ShopView(arcade.View):
             def on_click(event, option=i):
                 self.apply_upgrade(self.game_view.player_list[1], option)
 
+        # Add a button for Player 1 to gift coins to Player 2
+        gift_button_p1_to_p2 = UITextureButton(
+            text="Gift 10 Coins to Player 2",
+            texture=BUTTON_TEXTURE_NORMAL,
+            texture_hovered=BUTTON_TEXTURE_HOVER,
+            texture_pressed=BUTTON_TEXTURE_PRESS,
+            width=300
+        )
+        anchor.add(gift_button_p1_to_p2, align_x=-300, align_y=-200)
+        @gift_button_p1_to_p2.event("on_click")
+        def on_click(event):
+            self.gift_coins(self.game_view.player_list[0], self.game_view.player_list[1])
+
+        # Add a button for Player 2 to gift coins to Player 1
+        gift_button_p2_to_p1 = UITextureButton(
+            text="Gift 10 Coins to Player 1",
+            texture=BUTTON_TEXTURE_NORMAL,
+            texture_hovered=BUTTON_TEXTURE_HOVER,
+            texture_pressed=BUTTON_TEXTURE_PRESS,
+            width=300
+        )
+        anchor.add(gift_button_p2_to_p1, align_x=300, align_y=-200)
+        @gift_button_p2_to_p1.event("on_click")
+        def on_click(event):
+            self.gift_coins(self.game_view.player_list[1], self.game_view.player_list[0])
+
         # Add a button to return to the game
         back_button = UITextureButton(
             text="Return to Game",
@@ -191,6 +221,17 @@ class ShopView(arcade.View):
         @back_button.event("on_click")
         def on_click(event):
             self.window.show_view(self.game_view)
+
+    def gift_coins(self, giver, receiver):
+        """ Allow one player to gift 10 coins to another. """
+        if giver.score >= 10:
+            giver.score -= 10
+            receiver.score += 10
+            arcade.sound.play_sound(UPGRADE_SUCCESS_SOUND)  # Play success sound
+            print(f"{giver.playername} gifted 10 coins to {receiver.playername}!")
+        else:
+            arcade.sound.play_sound(UPGRADE_FAIL_SOUND)  # Play failure sound
+            print(f"{giver.playername} does not have enough coins to gift!")
 
     def apply_upgrade(self, player, upgrade_index):
         """ Apply the selected upgrade to the player. """
@@ -249,6 +290,54 @@ class ShopView(arcade.View):
         arcade.draw_text(f"Damage: {self.game_view.player_list[1].damage_factor:.1f}", stats_x_p2, WINDOW_HEIGHT - 320,
                          arcade.color.BLACK, font_size=16)
 
+class VictoryView(arcade.View):
+    """ Victory screen view. """
+
+    def __init__(self, wave):
+        super().__init__()
+        self.wave = wave
+        self.ui = UIManager()
+        self.background_color = arcade.color.BLIZZARD_BLUE
+
+    def on_show_view(self):
+        self.ui.enable()
+        self.setup_ui()
+
+    def on_hide_view(self):
+        self.ui.disable()
+
+    def setup_ui(self):
+        """ Set up the victory screen UI. """
+        self.ui.disable()
+        self.ui = UIManager()
+        self.ui.enable()
+
+        anchor = self.ui.add(UIAnchorLayout())
+
+        # Add a return to title button
+        return_button = UITextureButton(
+            text="Return to Title",
+            texture=BUTTON_TEXTURE_NORMAL,
+            texture_hovered=BUTTON_TEXTURE_HOVER,
+            texture_pressed=BUTTON_TEXTURE_PRESS,
+            width=300,
+            font_size=50
+        )
+        anchor.add(return_button, align_x=0, align_y=0)
+        @return_button.event("on_click")
+        def on_click(event):
+            title_view = TitleView()
+            self.window.show_view(title_view)  # Ensure it shows the title view without scheduling anything
+
+    def on_draw(self):
+        """ Render the victory screen. """
+        self.clear()
+        arcade.draw_text("Victory!", WINDOW_WIDTH // 2, WINDOW_HEIGHT - 200,
+                         arcade.color.GOLD, font_size=50, anchor_x="center")
+        arcade.draw_text(f"You completed {self.wave} waves!", WINDOW_WIDTH // 2, WINDOW_HEIGHT - 250,
+                         arcade.color.GREEN, font_size=20, anchor_x="center")
+        self.ui.draw()
+
 class GameView(arcade.View):
     """ Main application class. """
 
@@ -262,9 +351,10 @@ class GameView(arcade.View):
         self.player_list = arcade.SpriteList()
         self.enemy_lists = []
         self.bullet_list = None
-        self.min_spawns = [2, 5, 7, 9, 12, 16]  # Increased minimum spawns
-        self.max_spawns = [5, 8, 10, 12, 16, 21]  # Increased maximum spawns
-
+        # self.min_spawns = [2, 5, 7, 9, 12, 16,20,25,32, 41]  # Increased minimum spawns
+        # self.max_spawns = [5, 8, 10, 12, 16, 21, 27, 34, 40, 52]  # Increased maximum spawns
+        self.min_max_spawns = [(2,5), (5,8), (7,10), (9,12),
+                                (12,16), (16,21), (20,27), (25,34), (32,40), (41,52)]
         # Load sounds. Sounds from kenney.nl
         self.gun_sound = arcade.sound.load_sound(":resources:sounds/laser1.wav")
         self.hit_sound = arcade.sound.load_sound(":resources:sounds/phaseJump1.wav")
@@ -320,7 +410,7 @@ class GameView(arcade.View):
 
     def add_enemy_list(self, m) -> arcade.SpriteList:
         """ Create a new enemy type with a random number of spirte. """
-        min_spawn, max_spawn = self.min_spawns[m], self.max_spawns[m]
+        min_spawn, max_spawn = self.min_max_spawns[m]
         n = random.randrange(min_spawn, max_spawn)
         new_enemy_list = arcade.SpriteList()
         for i in range(n):
@@ -346,26 +436,21 @@ class GameView(arcade.View):
                                   scale=player_scales[i], skill_level=0, window_width=WINDOW_WIDTH, window_height=WINDOW_HEIGHT)
             player_sprite.center_x = 200 + i * 1000
             player_sprite.center_y = 70 + i * 800
-            ## gun is now handled by the Hero's weapons class
-            # gun = arcade.Sprite(f"sprites/Pistol.png", scale=0.5)
-            # player_sprite.gun = gun
+            player_sprite.kills = 0  # Initialize kills
+            player_sprite.deaths = 0  # Initialize deaths
             self.player_list.append(player_sprite)
 
-
-        
     def setup_enemies(self):
         """ Set up the enemies for the current wave. """
         self.wave += 1  # Increment the wave counter
-        for player in self.player_list:
-            player.damage = 5 + 5 * self.wave  # Increase player damage based on the wave
         # Increase spawn counts dynamically based on the wave
-        self.min_spawns = [min_spawn + self.wave for min_spawn in self.min_spawns]
-        self.max_spawns = [max_spawn + self.wave for max_spawn in self.max_spawns]
-
+        # self.min_spawns = [min_spawn + self.wave for min_spawn in self.min_spawns]
+        # self.max_spawns = [max_spawn + self.wave for max_spawn in self.max_spawns]
+        self.min_max_spawns = [(min_spawn + self.wave, max_spawn + self.wave) for min_spawn, max_spawn in self.min_max_spawns]
         # Prepare the enemies to spawn in batches
         self.enemies_to_spawn = []
         for i in range(self.num_type_monster):
-            min_spawn, max_spawn = self.min_spawns[i], self.max_spawns[i]
+            min_spawn, max_spawn = self.min_max_spawns[i]
             n = random.randint(min_spawn, max_spawn)
             for _ in range(n):
                 self.enemies_to_spawn.append(i)  # Add enemy type to the spawn queue
@@ -401,7 +486,7 @@ class GameView(arcade.View):
         self.p1_score = arcade.Text(
             'Player1 Score: 0', 
             10, 20,
-            arcade.color.BLACK,
+            arcade.color.PURPLE_HEART,
            PLAYER_INFO_FONT_SIZE
          )
         
@@ -421,7 +506,7 @@ class GameView(arcade.View):
         self.p2_health = arcade.Text(
             'Player2 Health: 1000',
             10, WINDOW_HEIGHT - 70,
-            arcade.color.RED,
+            arcade.color.AMARANTH_PURPLE,
             PLAYER_INFO_FONT_SIZE
         )
         self.p1_ammo = arcade.Text(
@@ -433,7 +518,7 @@ class GameView(arcade.View):
         self.p2_ammo = arcade.Text(
             'Player2 Ammo: 0',
             10, WINDOW_HEIGHT - 90,
-            arcade.color.RED,
+            arcade.color.GREEN,
             PLAYER_INFO_FONT_SIZE
         )
         self.p1_level = arcade.Text(
@@ -445,7 +530,7 @@ class GameView(arcade.View):
         self.p2_level = arcade.Text(
             'Player2 Ammo: 0',
             10, WINDOW_HEIGHT - 110,
-            arcade.color.RED,
+            arcade.color.GREEN,
             PLAYER_INFO_FONT_SIZE
         )
         
@@ -455,12 +540,17 @@ class GameView(arcade.View):
         health_textp1 = f"Player1 Health: {self.player_list[0].health:.1f}"
         ammo_textp1 = f"Player1 Ammo: {self.player_list[0].weapons.current_gun.loaded_bullets}"
         level_textp1 = f"Player1 Damage: {self.player_list[0].damage_factor:.1f}"
+        kills_textp1 = f"Player1 Kills: {self.player_list[0].kills}"
+        deaths_textp1 = f"Player1 Deaths: {self.player_list[0].deaths}"
 
         score_textp2 = f"Player2 Coins: {self.player_list[1].score}"
         health_textp2 = f"Player2 Health: {self.player_list[1].health:.1f}"
         ammo_textp2 = f"Player2 Ammo: {self.player_list[1].weapons.current_gun.loaded_bullets}"
         level_textp2 = f"Player2 Damage: {self.player_list[1].damage_factor:.1f}"
+        kills_textp2 = f"Player2 Kills: {self.player_list[1].kills}"
+        deaths_textp2 = f"Player2 Deaths: {self.player_list[1].deaths}"
 
+        # Player 1 stats
         self.p1_score.text = score_textp1
         self.p1_score.draw()
         self.p1_health.text = health_textp1
@@ -469,7 +559,10 @@ class GameView(arcade.View):
         self.p1_ammo.draw()
         self.p1_level.text = level_textp1
         self.p1_level.draw()
+        arcade.draw_text(kills_textp1, 10, 100, arcade.color.BLUE, PLAYER_INFO_FONT_SIZE)  # Kills text color
+        arcade.draw_text(deaths_textp1, 10, 120, arcade.color.ORANGE, PLAYER_INFO_FONT_SIZE)  # Deaths text color
 
+        # Player 2 stats
         self.p2_score.text = score_textp2
         self.p2_score.draw()
         self.p2_health.text = health_textp2
@@ -478,6 +571,8 @@ class GameView(arcade.View):
         self.p2_ammo.draw()
         self.p2_level.text = level_textp2
         self.p2_level.draw()
+        arcade.draw_text(kills_textp2, 10, WINDOW_HEIGHT - 130, arcade.color.BLUE, PLAYER_INFO_FONT_SIZE)  # Kills text color
+        arcade.draw_text(deaths_textp2, 10, WINDOW_HEIGHT - 150, arcade.color.ORANGE, PLAYER_INFO_FONT_SIZE)  # Deaths text color
 
         # Display respawn timers for players
         current_time = time.time()
@@ -573,9 +668,9 @@ class GameView(arcade.View):
             self.e2_pressed = False
 
     def update_player_movement(self, delta_time):
-        if self.shop_opened == False:
-        # Update player movement
-            if self.player_list[0].dead == False:
+        """Update player movement based on key presses."""
+        if not self.shop_opened:  # Only allow movement if the shop is closed
+            if not self.player_list[0].dead:  # Player 1 movement
                 if self.up_pressed:
                     self.player_list[0].increase_y()
                 if self.down_pressed:
@@ -590,7 +685,8 @@ class GameView(arcade.View):
                     self.player_list[0].angle -= 5  # Rotate counter-clockwise
                 if self.e2_pressed:
                     self.player_list[0].angle += 5  # Rotate clockwise
-            if self.player_list[1].dead == False:
+
+            if not self.player_list[1].dead:  # Player 2 movement
                 if self.w_pressed:
                     self.player_list[1].increase_y()
                 if self.s_pressed:
@@ -606,16 +702,14 @@ class GameView(arcade.View):
                 if self.e_pressed:
                     self.player_list[1].angle += 5  # Rotate clockwise
 
-
-
     def on_update(self, delta_time):
         """ Movement and game logic """
 
         if self.shop_opened == False:
             # Check win condition
             if self.wave >= WIN_CONDITION:
-                print("You win!")
-                arcade.exit()
+                victory_view = VictoryView(self.wave)
+                self.window.show_view(victory_view)
 
             # Check loss condition
             if all(player.dead for player in self.player_list):
@@ -667,6 +761,7 @@ class GameView(arcade.View):
                                 # print("Enemy removed")
                                 hit_list[0].remove_from_sprite_lists()
                                 player.add_score(hit_list[0].reward)
+                                player.kills += 1  # Increment kills when an enemy is defeated
                                 
                             if all(len(enemy_list) == 0 for enemy_list in self.enemy_lists):
                                 # print("All enemies defeated!")
@@ -693,6 +788,7 @@ class GameView(arcade.View):
                 current_time = time.time()
 
                 if player.dead == True and player.respawning == False:
+                    player.deaths += 1  # Increment deaths when the player dies
                     # print(f"Player {player.playername} is dead. Respawning...")
                     player.respawn_time = time.time() + 15
                     player.respawning = True
