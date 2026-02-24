@@ -33,6 +33,99 @@ BUTTON_TEXTURE_PRESS = arcade.load_texture(":resources:gui_basic_assets/button/r
 
 WIN_CONDITION = 10  # Number of waves to win the game
 
+class TitleView(arcade.View):
+    """ Title screen view. """
+
+    def __init__(self):
+        super().__init__()
+        self.ui = UIManager()
+        self.background_color = arcade.color.BLIZZARD_BLUE
+
+    def on_show_view(self):
+        self.ui.enable()
+        self.setup_ui()
+
+    def on_hide_view(self):
+        self.ui.disable()
+
+    def setup_ui(self):
+        """ Set up the title screen UI. """
+        self.ui.disable()
+        self.ui = UIManager()
+        self.ui.enable()
+
+        anchor = self.ui.add(UIAnchorLayout())
+
+        # Add a start button
+        start_button = UITextureButton(
+            text="Start Game",
+            texture=BUTTON_TEXTURE_NORMAL,
+            texture_hovered=BUTTON_TEXTURE_HOVER,
+            texture_pressed=BUTTON_TEXTURE_PRESS,
+            width=300
+        )
+        anchor.add(start_button, align_x=0, align_y=0)
+        @start_button.event("on_click")
+        def on_click(event):
+            game_view = GameView()
+            game_view.setup()
+            arcade.schedule(game_view.on_update, 1 / 60)  # Schedule the game update loop
+            self.window.show_view(game_view)
+
+    def on_draw(self):
+        """ Render the title screen. """
+        self.clear()
+        arcade.draw_text("Monster Shooter", WINDOW_WIDTH // 2, WINDOW_HEIGHT - 200,
+                         arcade.color.BLACK, font_size=50, anchor_x="center")
+        self.ui.draw()
+
+class GameOverView(arcade.View):
+    """ Game over screen view. """
+
+    def __init__(self, wave):
+        super().__init__()
+        self.wave = wave
+        self.ui = UIManager()
+        self.background_color = arcade.color.BLIZZARD_BLUE
+
+    def on_show_view(self):
+        self.ui.enable()
+        self.setup_ui()
+
+    def on_hide_view(self):
+        self.ui.disable()
+
+    def setup_ui(self):
+        """ Set up the game-over screen UI. """
+        self.ui.disable()
+        self.ui = UIManager()
+        self.ui.enable()
+
+        anchor = self.ui.add(UIAnchorLayout())
+
+        # Add a return to title button
+        return_button = UITextureButton(
+            text="Return to Title",
+            texture=BUTTON_TEXTURE_NORMAL,
+            texture_hovered=BUTTON_TEXTURE_HOVER,
+            texture_pressed=BUTTON_TEXTURE_PRESS,
+            width=300
+        )
+        anchor.add(return_button, align_x=0, align_y=0)
+        @return_button.event("on_click")
+        def on_click(event):
+            title_view = TitleView()
+            self.window.show_view(title_view)
+
+    def on_draw(self):
+        """ Render the game-over screen. """
+        self.clear()
+        arcade.draw_text("Game Over", WINDOW_WIDTH // 2, WINDOW_HEIGHT - 200,
+                         arcade.color.RED, font_size=50, anchor_x="center")
+        arcade.draw_text(f"You reached wave {self.wave}", WINDOW_WIDTH // 2, WINDOW_HEIGHT - 250,
+                         arcade.color.GREEN, font_size=20, anchor_x="center")
+        self.ui.draw()
+
 class ShopView(arcade.View):
     """ Shop view for buying weapons or upgrades. """
 
@@ -296,9 +389,11 @@ class GameView(arcade.View):
             self.enemy_lists[enemy_type].append(enemy)  # Add the enemy to the appropriate list
 
     def setup(self):
-        """ Set up the game and initialize the variables. """
+        """ Set up the game and reset variables. """
+        self.wave = 0
+        self.player_list = arcade.SpriteList()
+        self.enemy_lists = [arcade.SpriteList() for _ in range(self.num_type_monster)]
         self.setup_players()
-        self.enemy_lists = [arcade.SpriteList() for _ in range(self.num_type_monster)]  # Initialize enemy lists
         self.setup_enemies()
         self.setup_text()
    
@@ -407,13 +502,13 @@ class GameView(arcade.View):
                          arcade.color.BLACK, font_size=20, anchor_x="center")
 
     def on_key_press(self, key, modifiers):
-        if key == arcade.key.UP and not self.up_pressed:
+        if key == arcade.key.NUM_8 and not self.up_pressed:  # NUM 8 for up
             self.up_pressed = True
-        elif key == arcade.key.DOWN and not self.down_pressed:
+        elif key == arcade.key.NUM_5 and not self.down_pressed:  # NUM 5 for down
             self.down_pressed = True
-        elif key == arcade.key.LEFT and not self.left_pressed:
+        elif key == arcade.key.NUM_4 and not self.left_pressed:  # NUM 4 for left
             self.left_pressed = True
-        elif key == arcade.key.RIGHT and not self.right_pressed:
+        elif key == arcade.key.NUM_6 and not self.right_pressed:  # NUM 6 for right
             self.right_pressed = True
         elif key == arcade.key.W and not self.w_pressed:
             self.w_pressed = True
@@ -442,19 +537,19 @@ class GameView(arcade.View):
         elif key == arcade.key.F:
             #reload gun
             self.player_list[1].weapons.current_gun.reload_gun()
-        elif key == arcade.key.NUM_3:
+        elif key == arcade.key.NUM_ADD:
             self.player_list[0].weapons.current_gun.reload_gun()
         elif key == arcade.key.M:
             # Open or close the shop
             self.open_and_close_shop()
     def on_key_release(self, key, modifiers):
-        if key == arcade.key.UP and self.up_pressed:
+        if key == arcade.key.NUM_8 and self.up_pressed:  # NUM 8 for up
             self.up_pressed = False
-        elif key == arcade.key.DOWN and self.down_pressed:
+        elif key == arcade.key.NUM_5 and self.down_pressed:  # NUM 5 for down
             self.down_pressed = False
-        elif key == arcade.key.LEFT and self.left_pressed:
+        elif key == arcade.key.NUM_4 and self.left_pressed:  # NUM 4 for left
             self.left_pressed = False
-        elif key == arcade.key.RIGHT and self.right_pressed:
+        elif key == arcade.key.NUM_6 and self.right_pressed:  # NUM 6 for right
             self.right_pressed = False
         elif key == arcade.key.W and self.w_pressed:
             self.w_pressed = False
@@ -524,8 +619,8 @@ class GameView(arcade.View):
 
             # Check loss condition
             if all(player.dead for player in self.player_list):
-                print(f'Game Over! Both players are dead. You reached wave {self.wave}.')
-                arcade.exit()
+                game_over_view = GameOverView(self.wave)
+                self.window.show_view(game_over_view)
             
             for em_lst in self.enemy_lists:
                 for emy in em_lst:
@@ -623,15 +718,9 @@ def main():
     # Create a window class. This is what actually shows up on screen
     window = arcade.Window(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE, fullscreen=True)
 
-    # Create and setup the GameView
-    game = GameView()
-    game.setup()
-
-    # Set the desired FPS (e.g., 60 FPS)
-    arcade.schedule(game.on_update, 1 / 60)  # 1/60 seconds per frame for 60 FPS
-
-    # Show GameView on screen
-    window.show_view(game)
+    # Create and setup the TitleView
+    title_view = TitleView()
+    window.show_view(title_view)
 
     # Start the arcade game loop
     arcade.run()
