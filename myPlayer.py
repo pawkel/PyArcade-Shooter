@@ -18,6 +18,7 @@ class Hero(Sprite):
         self.skill_level = skill_level #or skill issue? jk jk
         #self.damage_factor = damage_factor_per_level[skill_level] if skill_level < len(damage_factor_per_level) else damage_factor_per_level[-1]
         self.damage_factor = 1
+        self.fire_rate_multiplier = 1.0  # Track fire rate upgrades
         self.playername = playername
         self.bullet_speed = 10
         self.current_gun_index = 0

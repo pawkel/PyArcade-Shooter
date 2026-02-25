@@ -21,9 +21,9 @@ TEX_RED_BUTTON_PRESS = arcade.load_texture(":resources:gui_basic_assets/button/r
 bullet_img_list=["sprites/Pistol_bullet.png", ":resources:images/space_shooter/laserBlue01.png"]
 
 colors = [arcade.color.RED, arcade.color.GREEN, arcade.color.BLUE, arcade.color.YELLOW, arcade.color.PURPLE]
-upgrade_names = ["Health Boost", "Damage Boost", "Speed Boost", "Fire Rate Boost", "Bullet Size Boost"]
-upgrade_multipliers = [100, 1.2, 1.5, 0.75, 1.1]  # Multipliers for each upgrade type
-upgrade_costs = [100, 150, 120, 200, 180]  # Costs for each upgrade type
+upgrade_names = ["Health Boost", "Damage Boost", "Speed Boost", "Fire Rate Boost", "Bullet Size Boost", "Magazine Size Boost"]
+upgrade_multipliers = [100, 1.2, 1.5, 0.75, 1.1, 1.5]  # Multipliers for each upgrade type
+upgrade_costs = [100, 150, 120, 200, 180, 150]  # Costs for each upgrade type
 
 UPGRADE_SUCCESS_SOUND = arcade.sound.load_sound(":resources:sounds/coin1.wav")
 UPGRADE_FAIL_SOUND = arcade.sound.load_sound(":resources:sounds/error4.wav")
@@ -244,9 +244,17 @@ class ShopView(arcade.View):
             elif upgrade_index == 2:  # Speed Boost
                 player.speed *= upgrade_multipliers[upgrade_index]
             elif upgrade_index == 3:  # Fire Rate Boost
-                player.weapons.current_gun.gun_cooldown *= upgrade_multipliers[upgrade_index]
+                # Store the fire rate upgrade multiplier at the player level
+                player.fire_rate_multiplier *= upgrade_multipliers[upgrade_index]
+                # Apply the fire rate upgrade to all guns
+                for i, gun in enumerate(player.weapons.guns):
+                    player.weapons.upgraded_cooldowns[i] *= upgrade_multipliers[upgrade_index]
+                    gun.gun_cooldown = player.weapons.upgraded_cooldowns[i]
             elif upgrade_index == 4:  # Bullet Size Boost
                 player.weapons.current_gun.bullet_scale *= upgrade_multipliers[upgrade_index]
+            elif upgrade_index == 5:  # Magazine Size Boost
+                player.weapons.current_gun.max_bullet_per_load = int(player.weapons.current_gun.max_bullet_per_load * upgrade_multipliers[upgrade_index])
+                player.weapons.current_gun.reload_gun()  # Reload to apply the new magazine size
             arcade.sound.play_sound(UPGRADE_SUCCESS_SOUND)
             print(f"{player.playername} upgraded {upgrade_names[upgrade_index]}!")
         else:
@@ -409,7 +417,7 @@ class GameView(arcade.View):
         self.ui.draw()
 
     def add_enemy_list(self, m) -> arcade.SpriteList:
-        """ Create a new enemy type with a random number of spirte. """
+        """ Create a new enemy type with a random number of sprites. """
         min_spawn, max_spawn = self.min_max_spawns[m]
         n = random.randrange(min_spawn, max_spawn)
         new_enemy_list = arcade.SpriteList()
@@ -420,7 +428,8 @@ class GameView(arcade.View):
                 speed += 0.5
             enemy = Monster(monster_id=m, scale=0.2, health=6 * (4 - m) ** 2, 
                             speed=speed, damage=5 - m, direction_bias=direction_bias,
-                            window_width=WINDOW_WIDTH, window_height=WINDOW_HEIGHT)
+                            window_width=WINDOW_WIDTH, window_height=WINDOW_HEIGHT,
+                            parent_list=new_enemy_list)  # Pass the parent list
             enemy.center_x = random.randrange(WINDOW_WIDTH)
             enemy.center_y = random.randrange(WINDOW_HEIGHT)
             new_enemy_list.append(enemy)
@@ -477,7 +486,7 @@ class GameView(arcade.View):
         """ Set up the game and reset variables. """
         self.wave = 0
         self.player_list = arcade.SpriteList()
-        self.enemy_lists = [arcade.SpriteList() for _ in range(self.num_type_monster)]
+        self.enemy_lists = [arcade.SpriteList() for _ in range(self.num_type_monster + 1)]  # Add an extra list for tiny enemies
         self.setup_players()
         self.setup_enemies()
         self.setup_text()
@@ -723,7 +732,7 @@ class GameView(arcade.View):
                     for bullet in emy.bullet_list:
                         for player in self.player_list:
                             if arcade.check_for_collision(bullet, player):
-                                player.take_damage(emy.damage-2)
+                                player.take_damage(emy.damage - 2)
                                 bullet.remove_from_sprite_lists()
                                 break
                     emy.bullet_list.update()
@@ -753,15 +762,29 @@ class GameView(arcade.View):
                             self.hit_sound.play()
 
                             # For every coin we hit, add to the score and remove the coin
-                            # for enemy in hit_list:
-                            hit_list[0].take_damage(player.weapons.current_gun.gun_damage*player.damage_factor)
-                            if hit_list[0].health <= 0:
-                                # print(f"Enemy {hit_list[0]} defeated!")
-                                # Remove the enemy from the sprite lists
-                                # print("Enemy removed")
-                                hit_list[0].remove_from_sprite_lists()
-                                player.add_score(hit_list[0].reward)
-                                player.kills += 1  # Increment kills when an enemy is defeated
+                            for enemy in hit_list:
+                                enemy.take_damage(player.weapons.current_gun.gun_damage * player.damage_factor)
+                                if enemy.health <= 0:
+                                    # Spawn tiny enemies if the defeated enemy is a big enemy
+                                    if enemy.monster_id == 0:  # Big enemy
+                                        for _ in range(random.randrange(5,15)):  # Spawn 4 tiny enemies
+                                            tiny_enemy = Monster(
+                                                monster_id=3,  # Tiny enemy ID
+                                                scale=0.1,  # Half the size
+                                                health=1,  # One-shot
+                                                speed=random.uniform(3.9,4.5),  # Really fast (2.5x speed of the big enemy)
+                                                damage=1,  # Adjust damage if needed
+                                                direction_bias=random.uniform(-0.5, 0.5),
+                                                window_width=WINDOW_WIDTH,
+                                                window_height=WINDOW_HEIGHT
+                                            )
+                                            tiny_enemy.center_x = enemy.center_x + random.randint(-20, 20)
+                                            tiny_enemy.center_y = enemy.center_y + random.randint(-20, 20)
+                                            self.enemy_lists[3].append(tiny_enemy)  # Add tiny enemy to the tiny enemy list
+
+                                    enemy.remove_from_sprite_lists()
+                                    player.add_score(enemy.reward)
+                                    player.kills += 1  # Increment kills when an enemy is defeated
                                 
                             if all(len(enemy_list) == 0 for enemy_list in self.enemy_lists):
                                 # print("All enemies defeated!")

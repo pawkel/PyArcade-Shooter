@@ -3,24 +3,26 @@ import math
 import random
 import arcade
 
-monster_img_list = ["sprites/Enemy_big.png", "sprites/Enemy_normal.png","sprites/Enemy_small.png"]
-bullet_scales = [1.5, 1, 0.5]  # Scale for bullets corresponding to monster sizes
+monster_img_list = ["sprites/Enemy_big.png", "sprites/Enemy_normal.png","sprites/Enemy_small.png", "sprites/Enemy_tiny.png"]
+bullet_scales = [1.5, 1, 0.5, 0.25]  # Scale for bullets corresponding to monster sizes
 class Monster(Sprite):
     def __init__(self, monster_id, scale=1.0, health=1, speed=2.0, damage=5, direction_bias=0,
-                 window_width=800, window_height=600, bullet_image=":resources:images/space_shooter/laserRed01.png"):
+                 window_width=800, window_height=600, bullet_image=":resources:images/space_shooter/laserRed01.png",
+                 parent_list=None):
         image = monster_img_list[monster_id]
         super().__init__(image, scale)
         self.monster_id = monster_id  # Unique identifier for the monster
         self.health = health
         self.speed = speed
         self.damage = damage
-        self.reward = self.monster_reward() ## Calculate the reward based on monster attributes
+        self.reward = self.monster_reward()  # Calculate the reward based on monster attributes
         self.direction_bias = direction_bias  # Bias for movement direction, can be used to influence monster behavior
         self.window_width = window_width
         self.window_height = window_height
         self.bullet_list = arcade.SpriteList()
         self.bullet_image = bullet_image
         self.shoot_timer = 0  # Timer to control shooting frequency
+        self.parent_list = parent_list  # Reference to the parent sprite list
 
     def monster_reward(self):
         return int((self.health * self.speed * self.damage)/15)

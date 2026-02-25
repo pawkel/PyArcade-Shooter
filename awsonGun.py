@@ -47,8 +47,10 @@ class Gun(Sprite):
         self.scale = gun_scales[gun_index]
         self.gun_distance = gun_distances[gun_index]
         self.texture = arcade.load_texture(Gun_imgs[gun_index])
-        self.gun_cooldown = gun_cooldowns[gun_index]
         self.gun_damage = gun_damages[gun_index]
+        # Preserve the upgraded gun_cooldown value
+        default_cooldown = gun_cooldowns[gun_index]
+        self.gun_cooldown = min(self.gun_cooldown, default_cooldown)  # Keep the upgraded cooldown if it's faster
 
     def update_gun(self, player_x, player_y, player_angle):
         self.angle = player_angle  # Update the gun's angle to match the player's angle
@@ -131,25 +133,34 @@ class Weapons(arcade.SpriteList):
     '''A class representing a collection of weapons.'''
     def __init__(self, n_slot: int=3):
         super().__init__()
-        self.n_slot = n_slot ## Number of slots for guns
+        self.n_slot = n_slot  # Number of slots for guns
         if n_slot > len(Gun_imgs):
             raise ValueError(f"n_slot must be less than or equal to {len(Gun_imgs)}")
-        self.guns = [Gun(Gun_imgs[i], Bullet_imgs[i], i,bullet_scale=bullet_scales[i],gun_damage=gun_damages[i],
-                         gun_cooldown=gun_cooldowns[0]) for i in range(n_slot)]
+        self.guns = [Gun(Gun_imgs[i], Bullet_imgs[i], i, bullet_scale=bullet_scales[i], gun_damage=gun_damages[i],
+                         gun_cooldown=gun_cooldowns[i]) for i in range(n_slot)]
         self.current_gun_index = 0
         self.current_gun = self.guns[self.current_gun_index]
         self.current_gun_to_draw = arcade.SpriteList()
         self.current_gun_to_draw.append(self.current_gun)
         self.current_gun.position = (0, 0)  # Set initial position to (0, 0)
 
+        # Track upgraded cooldowns for each gun
+        self.upgraded_cooldowns = gun_cooldowns.copy()
+
     def switch_gun(self):
         if not self.current_gun.visible:  # Prevent switching if the gun is hidden
             return
-        self.current_gun_index = (self.current_gun_index + 1) % self.n_slot   
+        self.current_gun_index = (self.current_gun_index + 1) % self.n_slot
         self.current_gun = self.guns[self.current_gun_index]
         self.current_gun.update_gun_config(self.current_gun_index)
+        self.current_gun.gun_cooldown = self.upgraded_cooldowns[self.current_gun_index]  # Use upgraded cooldown
         self.current_gun_to_draw = arcade.SpriteList()
         self.current_gun_to_draw.append(self.current_gun)
+
+    def apply_fire_rate_upgrade(self, multiplier: float):
+        """Apply a fire rate upgrade to the current gun."""
+        self.upgraded_cooldowns[self.current_gun_index] *= multiplier
+        self.current_gun.gun_cooldown = self.upgraded_cooldowns[self.current_gun_index]  # Update current gun's cooldown
 
     def draw_weapons(self):
         self.current_gun_to_draw.draw()
