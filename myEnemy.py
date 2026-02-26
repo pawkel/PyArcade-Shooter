@@ -2,14 +2,22 @@ from arcade import Sprite
 import math
 import random
 import arcade
-
-monster_img_list = ["sprites/Enemy_big.png", "sprites/Enemy_normal.png","sprites/Enemy_small.png", "sprites/Enemy_tiny.png"]
-bullet_scales = [1.5, 1, 0.5, 0.25]  # Scale for bullets corresponding to monster sizes
+import time
+WINDOW_WIDTH = 1920
+WINDOW_HEIGHT = 1080
+monster_img_list = ["sprites/Enemy_big.png", "sprites/Enemy_normal.png","sprites/Enemy_small.png", ["sprites/Enemy_tiny.png", "sprites/Enemy_tiny_orange.png",
+                     "sprites/Enemy_tiny_yellow.png", "sprites/Enemy_tiny_green.png", 
+                          "sprites/Enemy_tiny_blue.png", "sprites/Enemy_tiny_purple.png"], "sprites/Enemy_boss.png"]
+bullet_scales = [1.5, 1, 0.5, 0.25, 5]  # Scale for bullets corresponding to monster sizes
 class Monster(Sprite):
     def __init__(self, monster_id, scale=1.0, health=1, speed=2.0, damage=5, direction_bias=0,
                  window_width=800, window_height=600, bullet_image=":resources:images/space_shooter/laserRed01.png",
                  parent_list=None):
-        image = monster_img_list[monster_id]
+        if monster_id == 3:  # Tiny monster
+            image = random.choice(monster_img_list[3])  # Randomly select a tiny monster skin
+
+        else:
+            image = monster_img_list[monster_id]
         super().__init__(image, scale)
         self.monster_id = monster_id  # Unique identifier for the monster
         self.health = health
@@ -25,7 +33,7 @@ class Monster(Sprite):
         self.parent_list = parent_list  # Reference to the parent sprite list
 
     def monster_reward(self):
-        return int((self.health * self.speed * self.damage)/15)
+        return int((self.health * self.speed * self.damage)/30)
 
     def move(self, dx, dy):
         self.center_x += dx * self.speed
@@ -104,6 +112,8 @@ class Monster(Sprite):
 
     def update_shooting(self, delta_time, player1, player2):
         """ Update shooting logic. """
+        if self.monster_id == 3:  # Tiny enemies cannot shoot
+            return
         self.shoot_timer += delta_time
         if self.shoot_timer > random.uniform(7.5, 12.5):  # Shoot every 2 seconds
             # Determine the closest player
@@ -114,3 +124,39 @@ class Monster(Sprite):
             # Shoot towards the closest player
             self.shoot(closest_player)
             self.shoot_timer = 0
+
+class Boss(Monster):
+    """ Boss enemy class. """
+
+    def __init__(self, **kwargs):
+
+        
+        super().__init__(**kwargs)
+        self.scale = 0.6  # Boss is 3 times bigger than the big enemy
+        self.health = 1000  # High health for the boss
+        self.damage = 25  # High damage
+        self.laser_cooldown = 3  # Cooldown for the massive laser
+        self.last_laser_time = 0
+        self.monster_id = 4
+
+    def shoot_laser(self, delta_time, players):
+        """ Shoot a massive laser at players. """
+        current_time = time.time()
+        if current_time - self.last_laser_time >= self.laser_cooldown:
+            self.last_laser_time = current_time
+            for player in players:
+                if not player.dead:
+                    """ Enemy shoots a bullet towards the closest player. """
+                    bullet_scale = bullet_scales[self.monster_id]  # Get the bullet scale based on monster size
+                    bullet = arcade.Sprite(self.bullet_image, bullet_scale)
+                    bullet.center_x = self.center_x
+                    bullet.center_y = self.center_y
+
+                    # Calculate direction to the closest player
+                    dx = player.center_x - self.center_x
+                    dy = player.center_y - self.center_y
+                    angle = math.atan2(dy, dx)
+                    bullet.angle = -math.degrees(angle) + 90 # Normalize angle to [0, 360)
+                    # Set bullet velocity
+                    bullet.change_x = math.cos(angle) * 3.5
+                    bullet.change_y = math.sin(angle) * 3.5

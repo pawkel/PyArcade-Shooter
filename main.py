@@ -7,7 +7,7 @@ import arcade
 import math
 import time  # Add import for time module
 from myPlayer import Hero
-from myEnemy import Monster #thats very very mean
+from myEnemy import Monster, Boss #thats very very mean
 import arcade
 from arcade.gui import *
 
@@ -346,6 +346,8 @@ class VictoryView(arcade.View):
                          arcade.color.GREEN, font_size=20, anchor_x="center")
         self.ui.draw()
 
+
+
 class GameView(arcade.View):
     """ Main application class. """
 
@@ -393,6 +395,8 @@ class GameView(arcade.View):
         self.spawn_timer = 0  # Timer to track enemy spawn intervals
         self.spawn_delay = 10  # Delay between batches (in seconds)
         self.enemies_to_spawn = []  # Queue of enemies to spawn
+
+        self.boss_spawned = False  # Add a flag to track if the boss has been spawned
 
         #UI
         self.ui = UIManager()
@@ -473,7 +477,7 @@ class GameView(arcade.View):
             # Create a single enemy of the specified type
             speed = random.uniform(0.5, enemy_type + 0.51) + 0.1 * enemy_type
             direction_bias = random.uniform(-0.5, 0.5)  # Small random factor to add variability
-            if enemy_type == 0:  # Big enemy gets a speed boost
+            if enemy_type == 0:  # Big enemy
                 speed += 0.5
             enemy = Monster(monster_id=enemy_type, scale=0.2, health=6 * (4 - enemy_type) ** 2,
                             speed=speed, damage=5 - enemy_type, direction_bias=direction_bias,
@@ -486,10 +490,11 @@ class GameView(arcade.View):
         """ Set up the game and reset variables. """
         self.wave = 0
         self.player_list = arcade.SpriteList()
-        self.enemy_lists = [arcade.SpriteList() for _ in range(self.num_type_monster + 1)]  # Add an extra list for tiny enemies
+        self.enemy_lists = [arcade.SpriteList() for _ in range(self.num_type_monster + 2)]  # Add an extra list for the boss
         self.setup_players()
         self.setup_enemies()
         self.setup_text()
+        self.boss_spawned = False  # Reset the boss_spawned flag
    
     def setup_text(self):
         self.p1_score = arcade.Text(
@@ -646,6 +651,15 @@ class GameView(arcade.View):
         elif key == arcade.key.M:
             # Open or close the shop
             self.open_and_close_shop()
+        # elif key == arcade.key.Y:
+        #     for player in self.player_list:
+        #         player.score += 1000000  # Add 1,000,000 coins to each player
+        #         print(f"{player.playername} now has {player.score} coins!")
+        # elif key == arcade.key.T:
+        #     self.wave = WIN_CONDITION-1  # Set the wave to the last wave
+        #     self.setup_enemies()  # Set up enemies for the last wave
+        #     print(f"Jumped to wave {self.wave}!")
+
     def on_key_release(self, key, modifiers):
         if key == arcade.key.NUM_8 and self.up_pressed:  # NUM 8 for up
             self.up_pressed = False
@@ -711,12 +725,45 @@ class GameView(arcade.View):
                 if self.e_pressed:
                     self.player_list[1].angle += 5  # Rotate clockwise
 
+    def setup_boss(self):
+        """ Set up the boss for wave 10. """
+        boss = Boss(
+            monster_id=4,
+            scale=0.6,
+            health=1000,
+            speed=1,
+            damage=10,
+            direction_bias=0,
+            window_width=WINDOW_WIDTH,
+            window_height=WINDOW_HEIGHT
+        )
+        boss.center_x = WINDOW_WIDTH // 2
+        boss.center_y = WINDOW_HEIGHT // 2
+        self.enemy_lists[-1].append(boss)  # Add the boss to the last enemy list
+
+    def spawn_tiny_enemies(self, amount, center_x, center_y):
+        """ Spawn a specified number of tiny enemies at the given position. """
+        for _ in range(amount):
+            tiny_enemy = Monster(
+                monster_id=3,  # Tiny enemy ID
+                scale=0.09,
+                health=1,
+                speed=random.uniform(3.9, 4.5),
+                damage=1,
+                direction_bias=random.uniform(-0.5, 0.5),
+                window_width=WINDOW_WIDTH,
+                window_height=WINDOW_HEIGHT
+                )
+            tiny_enemy.center_x = center_x + random.randint(-50, 50)
+            tiny_enemy.center_y = center_y + random.randint(-50, 50)
+            self.enemy_lists[3].append(tiny_enemy)
+
     def on_update(self, delta_time):
         """ Movement and game logic """
 
         if self.shop_opened == False:
             # Check win condition
-            if self.wave >= WIN_CONDITION:
+            if self.wave > WIN_CONDITION:
                 victory_view = VictoryView(self.wave)
                 self.window.show_view(victory_view)
 
@@ -727,6 +774,8 @@ class GameView(arcade.View):
             
             for em_lst in self.enemy_lists:
                 for emy in em_lst:
+                    if isinstance(emy, Boss):
+                        emy.shoot_laser(delta_time, self.player_list)
                     emy.move_towards_closest_player(self.player_list[0], self.player_list[1])
                     emy.update_shooting(delta_time, self.player_list[0], self.player_list[1])  # Pass players
                     for bullet in emy.bullet_list:
@@ -736,6 +785,8 @@ class GameView(arcade.View):
                                 bullet.remove_from_sprite_lists()
                                 break
                     emy.bullet_list.update()
+                    if emy.health <= 0:
+                        emy.remove_from_sprite_lists()
             
             # Update spawn timer and spawn enemy batches periodically
             self.spawn_timer += delta_time
@@ -767,21 +818,9 @@ class GameView(arcade.View):
                                 if enemy.health <= 0:
                                     # Spawn tiny enemies if the defeated enemy is a big enemy
                                     if enemy.monster_id == 0:  # Big enemy
-                                        for _ in range(random.randrange(5,15)):  # Spawn 4 tiny enemies
-                                            tiny_enemy = Monster(
-                                                monster_id=3,  # Tiny enemy ID
-                                                scale=0.1,  # Half the size
-                                                health=1,  # One-shot
-                                                speed=random.uniform(3.9,4.5),  # Really fast (2.5x speed of the big enemy)
-                                                damage=1,  # Adjust damage if needed
-                                                direction_bias=random.uniform(-0.5, 0.5),
-                                                window_width=WINDOW_WIDTH,
-                                                window_height=WINDOW_HEIGHT
-                                            )
-                                            tiny_enemy.center_x = enemy.center_x + random.randint(-20, 20)
-                                            tiny_enemy.center_y = enemy.center_y + random.randint(-20, 20)
-                                            self.enemy_lists[3].append(tiny_enemy)  # Add tiny enemy to the tiny enemy list
-
+                                        self.spawn_tiny_enemies(random.randint(5, 15), enemy.center_x, enemy.center_y)
+                                    if enemy.monster_id == 4:
+                                        self.spawn_tiny_enemies(random.randint(100,250), enemy.center_x, enemy.center_y)
                                     enemy.remove_from_sprite_lists()
                                     player.add_score(enemy.reward)
                                     player.kills += 1  # Increment kills when an enemy is defeated
@@ -821,6 +860,10 @@ class GameView(arcade.View):
                     player.respawning = False
                     player.dead = False
                     # print(f"Player {player.playername} has respawned.")
+
+        if self.wave == 10 and not self.boss_spawned:
+            self.setup_boss()
+            self.boss_spawned = True  # Set the flag to True after spawning the boss
 
     def open_and_close_shop(self):
         """ Open the shop to buy new weapons or upgrades. """
